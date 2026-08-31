@@ -42,6 +42,7 @@ namespace ControlUnitTests
         TEST_METHOD(TestSelectOutputSimple);
         TEST_METHOD(TestCommandContext);
         TEST_METHOD(TestCommandContextWithPwshGhostText);
+        TEST_METHOD(TestQuickFixClear);
 
         TEST_METHOD(TestSelectOutputScrolling);
         TEST_METHOD(TestSelectOutputExactWrap);
@@ -611,6 +612,31 @@ namespace ControlUnitTests
             VERIFY_ARE_EQUAL(4u, curr.size());
             VERIFY_ARE_EQUAL(L"BarB", curr);
         }
+    }
+
+    void ControlCoreTests::TestQuickFixClear()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        auto core = createCore(*settings, *conn);
+        VERIFY_IS_NOT_NULL(core);
+        _standardInit(core);
+
+        auto suggestions = single_threaded_vector<hstring>();
+        suggestions.Append(L"wsl.exe --exec grep");
+        core->UpdateQuickFixes(suggestions);
+        VERIFY_IS_TRUE(core->QuickFixesAvailable());
+        VERIFY_IS_NOT_NULL(core->CommandHistory().QuickFixes());
+
+        core->ClearQuickFix();
+        VERIFY_IS_FALSE(core->QuickFixesAvailable());
+        VERIFY_IS_NULL(core->CommandHistory().QuickFixes());
+        VERIFY_IS_FALSE(core->TryUpdateQuickFixes(suggestions));
+
+        core->_terminalSearchMissingCommand(L"grep", 0);
+        VERIFY_IS_FALSE(core->QuickFixesAvailable());
+        VERIFY_IS_NOT_NULL(core->CommandHistory().QuickFixes());
+        VERIFY_IS_TRUE(core->TryUpdateQuickFixes(suggestions));
+        VERIFY_IS_TRUE(core->QuickFixesAvailable());
     }
 
     void ControlCoreTests::TestSelectOutputScrolling()

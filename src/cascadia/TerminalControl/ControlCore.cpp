@@ -1708,6 +1708,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void ControlCore::_terminalSearchMissingCommand(std::wstring_view missingCommand, const til::CoordType& bufferRow)
     {
+        BeginQuickFixRequest();
         SearchMissingCommand.raise(*this, make<implementation::SearchMissingCommandEventArgs>(hstring{ missingCommand }, bufferRow));
     }
 
@@ -1724,7 +1725,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void ControlCore::ClearQuickFix()
     {
-        _cachedQuickFixes = nullptr;
+        {
+            const std::scoped_lock lock{ _quickFixMutex };
+            _cachedQuickFixes = nullptr;
+        }
         RefreshQuickFixUI.raise(*this, nullptr);
     }
 
@@ -2450,18 +2454,43 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         auto context = winrt::make_self<CommandHistoryContext>(std::move(commands));
         context->CurrentCommandline(trimmedCurrentCommand);
-        context->QuickFixes(_cachedQuickFixes);
+        {
+            const std::scoped_lock quickFixLock{ _quickFixMutex };
+            context->QuickFixes(_cachedQuickFixes);
+        }
         return *context;
     }
 
-    bool ControlCore::QuickFixesAvailable() const noexcept
+    bool ControlCore::QuickFixesAvailable() const
     {
+        const std::scoped_lock lock{ _quickFixMutex };
         return _cachedQuickFixes && _cachedQuickFixes.Size() > 0;
+    }
+
+    void ControlCore::BeginQuickFixRequest()
+    {
+        // A non-null cache marks this request active so delayed updates can be
+        // rejected after ClearQuickFix changes it back to null.
+        const std::scoped_lock lock{ _quickFixMutex };
+        _cachedQuickFixes = winrt::multi_threaded_vector<hstring>();
     }
 
     void ControlCore::UpdateQuickFixes(const Windows::Foundation::Collections::IVector<hstring>& quickFixes)
     {
+        const std::scoped_lock lock{ _quickFixMutex };
         _cachedQuickFixes = quickFixes;
+    }
+
+    bool ControlCore::TryUpdateQuickFixes(const Windows::Foundation::Collections::IVector<hstring>& quickFixes)
+    {
+        const std::scoped_lock lock{ _quickFixMutex };
+        if (!_cachedQuickFixes)
+        {
+            return false;
+        }
+
+        _cachedQuickFixes = quickFixes;
+        return true;
     }
 
     bool ControlCore::HasUnfocusedAppearance() const

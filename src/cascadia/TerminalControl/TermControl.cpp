@@ -3744,7 +3744,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void TermControl::UpdateWinGetSuggestions(Windows::Foundation::Collections::IVector<hstring> suggestions)
     {
-        get_self<ControlCore>(_core)->UpdateQuickFixes(suggestions);
+        get_self<ControlCore>(_core)->TryUpdateQuickFixes(suggestions);
     }
 
     void TermControl::AdjustOpacity(const float opacity, const bool relative)

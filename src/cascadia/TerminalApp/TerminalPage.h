@@ -6,6 +6,7 @@
 #include <ThrottledFunc.h>
 
 #include "TerminalPage.g.h"
+#include "QuickFixRequestTracker.h"
 #include "Tab.h"
 #include "AppKeyBindings.h"
 #include "AppCommandlineArgs.h"
@@ -608,7 +609,10 @@ namespace winrt::TerminalApp::implementation
         void _OpenSuggestions(const Microsoft::Terminal::Control::TermControl& sender, Windows::Foundation::Collections::IVector<winrt::Microsoft::Terminal::Settings::Model::Command> commandsCollection, winrt::TerminalApp::SuggestionsMode mode, winrt::hstring filterText);
 
         void _ShowWindowChangedHandler(const IInspectable sender, const winrt::Microsoft::Terminal::Control::ShowWindowArgs args);
-        Windows::Foundation::IAsyncAction _SearchMissingCommandHandler(const IInspectable sender, const winrt::Microsoft::Terminal::Control::SearchMissingCommandEventArgs args);
+        safe_void_coroutine _SearchMissingCommandHandler(const IInspectable sender,
+                                                         const winrt::Microsoft::Terminal::Control::SearchMissingCommandEventArgs args,
+                                                         std::shared_ptr<::TerminalApp::QuickFixRequestTracker> requestTracker,
+                                                         uint64_t requestId);
         static Windows::Foundation::IAsyncOperation<Windows::Foundation::Collections::IVectorView<winrt::Microsoft::Management::Deployment::MatchResult>> _FindPackageAsync(hstring query);
 
         void _WindowSizeChanged(const IInspectable sender, const winrt::Microsoft::Terminal::Control::WindowSizeChangedEventArgs args);
@@ -628,7 +632,9 @@ namespace winrt::TerminalApp::implementation
         void _sendDraggedTabToWindow(const winrt::hstring& windowId, const uint32_t tabIndex, std::optional<winrt::Windows::Foundation::Point> dragPoint);
 
         void _PopulateContextMenu(const Microsoft::Terminal::Control::TermControl& control, const Microsoft::UI::Xaml::Controls::CommandBarFlyout& sender, const bool withSelection);
-        void _PopulateQuickFixMenu(const Microsoft::Terminal::Control::TermControl& control, const Windows::UI::Xaml::Controls::MenuFlyout& sender);
+        void _PopulateQuickFixMenu(const Microsoft::Terminal::Control::TermControl& control,
+                                   const Windows::UI::Xaml::Controls::MenuFlyout& sender,
+                                   std::shared_ptr<::TerminalApp::QuickFixRequestTracker> requestTracker);
         void _PopulateWorkspaceFlyout();
         winrt::Windows::UI::Xaml::Controls::MenuFlyout _CreateRunAsAdminFlyout(int profileIndex);
 
