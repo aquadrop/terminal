@@ -23,9 +23,27 @@ static constexpr std::wstring_view POWERSHELL_ICON{ L"ms-appx:///ProfileIcons/pw
 static constexpr std::wstring_view POWERSHELL_PREVIEW_ICON{ L"ms-appx:///ProfileIcons/pwsh-preview.png" };
 static constexpr std::wstring_view GENERATOR_POWERSHELL_ICON{ L"ms-appx:///ProfileGeneratorIcons/PowerShell.png" };
 static constexpr std::wstring_view POWERSHELL_PREFERRED_PROFILE_NAME{ L"PowerShell" };
+static constexpr std::wstring_view COMPATIBILITY_MODULE_RELATIVE_PATH{ LR"(PowerShell\Modules\Terminal.UnixCompatibility\Terminal.UnixCompatibility.psd1)" };
 
 namespace
 {
+    std::wstring _getCompatibilityModulePath() noexcept
+    try
+    {
+        std::filesystem::path modulePath{ wil::GetModuleFileNameW<std::wstring>(nullptr) };
+        modulePath.replace_filename(COMPATIBILITY_MODULE_RELATIVE_PATH);
+        if (std::filesystem::exists(modulePath))
+        {
+            return modulePath.parent_path().parent_path().native();
+        }
+        return {};
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        return {};
+    }
+
     enum PowerShellFlags
     {
         None = 0,
@@ -314,6 +332,7 @@ std::wstring_view PowershellCoreProfileGenerator::GetIcon() const noexcept
 void PowershellCoreProfileGenerator::GenerateProfiles(std::vector<winrt::com_ptr<implementation::Profile>>& profiles) const
 {
     const auto psInstances = _collectPowerShellInstances();
+    const auto compatibilityModulePath = _getCompatibilityModulePath();
     auto first = true;
 
     for (const auto& psI : psInstances)
@@ -333,6 +352,12 @@ void PowershellCoreProfileGenerator::GenerateProfiles(std::vector<winrt::com_ptr
         profile->DefaultAppearance().DarkColorSchemeName(L"Campbell");
         profile->DefaultAppearance().LightColorSchemeName(L"Campbell");
         profile->Icon(winrt::hstring{ WI_IsFlagSet(psI.flags, PowerShellFlags::Preview) ? POWERSHELL_PREVIEW_ICON : POWERSHELL_ICON });
+        if (!compatibilityModulePath.empty())
+        {
+            auto environment = winrt::single_threaded_map<winrt::hstring, winrt::hstring>();
+            environment.Insert(L"PSModulePath", winrt::hstring{ compatibilityModulePath + L";%PSModulePath%" });
+            profile->EnvironmentVariables(environment);
+        }
 
         if (first)
         {

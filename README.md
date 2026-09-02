@@ -210,6 +210,10 @@ sends the Home sequence and `Ctrl+E` sends the End sequence. These are global
 Terminal bindings, so applications receive Home or End instead of the original
 control characters.
 
+Generated PowerShell profiles also add a packaged compatibility module to
+`PSModulePath`. This provides `!!` as an alias for `Invoke-History`; PowerShell
+already supports `cd -` for switching back to the previous directory.
+
 ---
 
 ## Terminal & Console Overview
