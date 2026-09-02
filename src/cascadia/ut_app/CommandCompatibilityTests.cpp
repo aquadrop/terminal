@@ -59,7 +59,7 @@ namespace TerminalAppUnitTests
             VERIFY_ARE_EQUAL(suggestions.size(), uppercaseSuggestions.size());
             for (size_t suggestionIndex = 0; suggestionIndex < suggestions.size(); ++suggestionIndex)
             {
-                VERIFY_ARE_EQUAL(suggestions[suggestionIndex].c_str(), uppercaseSuggestions[suggestionIndex].c_str());
+                VERIFY_IS_TRUE(suggestions[suggestionIndex] == uppercaseSuggestions[suggestionIndex]);
             }
 
             for (const auto& suggestion : suggestions)
@@ -76,7 +76,7 @@ namespace TerminalAppUnitTests
             {
                 const auto wslSuggestion = std::find(suggestions.begin(), suggestions.end(), expected);
                 VERIFY_IS_TRUE(wslSuggestion != suggestions.end());
-                VERIFY_ARE_EQUAL(L"wsl.exe --install", suggestions.back().c_str());
+                VERIFY_IS_TRUE(suggestions.back() == L"wsl.exe --install");
             }
         }
     }
@@ -93,7 +93,7 @@ namespace TerminalAppUnitTests
         {
             const auto suggestions = ::TerminalApp::CommandCompatibility::GetQuickFixes(command);
             VERIFY_ARE_EQUAL(3u, suggestions.size());
-            VERIFY_ARE_EQUAL(expectedSuggestion.data(), suggestions.front().c_str());
+            VERIFY_IS_TRUE(suggestions.front() == expectedSuggestion);
         }
     }
 
