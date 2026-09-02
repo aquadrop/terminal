@@ -205,6 +205,11 @@ Terminal still offers explicit WSL execution and installation quick fixes.
 Selecting a quick fix inserts it for review rather than executing it
 automatically.
 
+For Linux-style command-line navigation across all hosted shells, `Ctrl+A`
+sends the Home sequence and `Ctrl+E` sends the End sequence. These are global
+Terminal bindings, so applications receive Home or End instead of the original
+control characters.
+
 ---
 
 ## Terminal & Console Overview
