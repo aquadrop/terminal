@@ -15,6 +15,7 @@
     - [Via Chocolatey (unofficial)](#via-chocolatey-unofficial)
     - [Via Scoop (unofficial)](#via-scoop-unofficial)
 - [Installing Windows Terminal Canary](#installing-windows-terminal-canary)
+- [Unix-style command compatibility on Windows](#unix-style-command-compatibility-on-windows)
 - [Terminal \& Console Overview](#terminal--console-overview)
   - [Windows Terminal](#windows-terminal)
   - [The Windows Console Host](#the-windows-console-host)
@@ -174,6 +175,23 @@ The Portable ZIP distribution is a portable application. It will not automatical
 | Portable ZIP  | x86             | [Download](https://aka.ms/terminal-canary-zip-x86)   |
 
 _Learn more about the [types of Windows Terminal distributions](https://learn.microsoft.com/windows/terminal/distributions)._
+
+---
+
+## Unix-style command compatibility on Windows
+
+When command-not-found integration recognizes a curated Unix command, Windows
+Terminal offers a quick fix instead of silently changing shell behavior.
+Common commands such as `cp`, `mv`, and `grep` prioritize the Windows-native
+PowerShell equivalents `Copy-Item`, `Move-Item`, and `Select-String`. Other
+supported executables can be run through WSL when an installed distribution
+provides them.
+
+`rm` is handled specially for Windows safety. Its quick fix accepts one or more
+literal file or directory paths and moves them to the Windows Recycle Bin; it
+never delegates deletion to WSL and does not use `Remove-Item`, which would
+permanently delete the items. The inserted command can be reviewed or edited
+before execution, like every Terminal quick fix.
 
 ---
 

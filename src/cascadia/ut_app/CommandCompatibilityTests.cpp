@@ -15,6 +15,8 @@ namespace TerminalAppUnitTests
         END_TEST_CLASS()
 
         TEST_METHOD(CommonLinuxCommandsUseWsl);
+        TEST_METHOD(CommonFileCommandsPreferWindowsBehavior);
+        TEST_METHOD(RemoveUsesRecycleBin);
         TEST_METHOD(QuickFixRequestsAreTrackedPerControl);
         TEST_METHOD(ShellBuiltinsHaveNoBuiltInFix);
         TEST_METHOD(UnsafeOrUnknownCommandsHaveNoBuiltInFix);
@@ -41,14 +43,8 @@ namespace TerminalAppUnitTests
             }
 
             const auto suggestions = ::TerminalApp::CommandCompatibility::GetQuickFixes(command);
-            VERIFY_ARE_EQUAL(2u, suggestions.size());
-
             std::wstring expected{ L"wsl.exe --exec " };
             expected.append(command);
-            VERIFY_ARE_EQUAL(expected.c_str(), suggestions.at(0).c_str());
-            VERIFY_ARE_EQUAL(L"wsl.exe --install", suggestions.at(1).c_str());
-            VERIFY_IS_TRUE(suggestions.at(0).find_first_of(L"\r\n") == std::wstring::npos);
-            VERIFY_IS_TRUE(suggestions.at(1).find_first_of(L"\r\n") == std::wstring::npos);
 
             std::wstring uppercase{ command };
             for (auto& ch : uppercase)
@@ -60,12 +56,60 @@ namespace TerminalAppUnitTests
             }
 
             const auto uppercaseSuggestions = ::TerminalApp::CommandCompatibility::GetQuickFixes(uppercase);
-            VERIFY_ARE_EQUAL(2u, uppercaseSuggestions.size());
-            VERIFY_ARE_EQUAL(expected.c_str(), uppercaseSuggestions.at(0).c_str());
-            VERIFY_ARE_EQUAL(L"wsl.exe --install", uppercaseSuggestions.at(1).c_str());
-            VERIFY_IS_TRUE(uppercaseSuggestions.at(0).find_first_of(L"\r\n") == std::wstring::npos);
-            VERIFY_IS_TRUE(uppercaseSuggestions.at(1).find_first_of(L"\r\n") == std::wstring::npos);
+            VERIFY_ARE_EQUAL(suggestions.size(), uppercaseSuggestions.size());
+            for (size_t suggestionIndex = 0; suggestionIndex < suggestions.size(); ++suggestionIndex)
+            {
+                VERIFY_ARE_EQUAL(suggestions[suggestionIndex].c_str(), uppercaseSuggestions[suggestionIndex].c_str());
+            }
+
+            for (const auto& suggestion : suggestions)
+            {
+                VERIFY_IS_TRUE(suggestion.find_first_of(L"\r\n") == std::wstring::npos);
+            }
+
+            if (command == L"rm")
+            {
+                VERIFY_ARE_EQUAL(1u, suggestions.size());
+                VERIFY_IS_TRUE(suggestions.at(0).find(L"SendToRecycleBin") != std::wstring::npos);
+            }
+            else
+            {
+                const auto wslSuggestion = std::find(suggestions.begin(), suggestions.end(), expected);
+                VERIFY_IS_TRUE(wslSuggestion != suggestions.end());
+                VERIFY_ARE_EQUAL(L"wsl.exe --install", suggestions.back().c_str());
+            }
         }
+    }
+
+    void CommandCompatibilityTests::CommonFileCommandsPreferWindowsBehavior()
+    {
+        constexpr std::pair<std::wstring_view, std::wstring_view> commands[]{
+            { L"cp", L"Copy-Item" },
+            { L"grep", L"Select-String" },
+            { L"mv", L"Move-Item" },
+        };
+
+        for (const auto& [command, expectedSuggestion] : commands)
+        {
+            const auto suggestions = ::TerminalApp::CommandCompatibility::GetQuickFixes(command);
+            VERIFY_ARE_EQUAL(3u, suggestions.size());
+            VERIFY_ARE_EQUAL(expectedSuggestion.data(), suggestions.front().c_str());
+        }
+    }
+
+    void CommandCompatibilityTests::RemoveUsesRecycleBin()
+    {
+        const auto suggestions = ::TerminalApp::CommandCompatibility::GetQuickFixes(L"rm");
+        VERIFY_ARE_EQUAL(1u, suggestions.size());
+
+        const auto& command = suggestions.front();
+        VERIFY_IS_TRUE(command.starts_with(L"powershell.exe -NoProfile -Command"));
+        VERIFY_IS_TRUE(command.find(L"ValueFromRemainingArguments=$true") != std::wstring::npos);
+        VERIFY_IS_TRUE(command.find(L"DeleteFile") != std::wstring::npos);
+        VERIFY_IS_TRUE(command.find(L"DeleteDirectory") != std::wstring::npos);
+        VERIFY_IS_TRUE(command.find(L"SendToRecycleBin") != std::wstring::npos);
+        VERIFY_IS_TRUE(command.find(L"Remove-Item") == std::wstring::npos);
+        VERIFY_IS_TRUE(command.find(L"wsl") == std::wstring::npos);
     }
 
     void CommandCompatibilityTests::QuickFixRequestsAreTrackedPerControl()
