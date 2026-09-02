@@ -19,6 +19,7 @@
     </ClCompile>
     <ClCompile Include="AppCommandlineArgs.cpp" />
     <ClCompile Include="Commandline.cpp" />
+    <ClCompile Include="CommandCompatibility.cpp" />
     <ClCompile Include="DebugTapConnection.cpp" />
     <ClCompile Include="Jumplist.cpp" />
     <ClCompile Include="FilteredCommand.cpp">
@@ -44,7 +45,9 @@
     </ClInclude>
     <ClInclude Include="AppCommandlineArgs.h" />
     <ClInclude Include="Commandline.h" />
+    <ClInclude Include="CommandCompatibility.h" />
     <ClInclude Include="DebugTapConnection.h" />
+    <ClInclude Include="QuickFixRequestTracker.h" />
     <ClInclude Include="Jumplist.h" />
     <ClInclude Include="FilteredCommand.h">
       <Filter>commandPalette</Filter>

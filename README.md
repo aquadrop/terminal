@@ -15,6 +15,7 @@
     - [Via Chocolatey (unofficial)](#via-chocolatey-unofficial)
     - [Via Scoop (unofficial)](#via-scoop-unofficial)
 - [Installing Windows Terminal Canary](#installing-windows-terminal-canary)
+- [Unix-style command compatibility on Windows](#unix-style-command-compatibility-on-windows)
 - [Terminal \& Console Overview](#terminal--console-overview)
   - [Windows Terminal](#windows-terminal)
   - [The Windows Console Host](#the-windows-console-host)
@@ -174,6 +175,40 @@ The Portable ZIP distribution is a portable application. It will not automatical
 | Portable ZIP  | x86             | [Download](https://aka.ms/terminal-canary-zip-x86)   |
 
 _Learn more about the [types of Windows Terminal distributions](https://learn.microsoft.com/windows/terminal/distributions)._
+
+---
+
+## Unix-style command compatibility on Windows
+
+Packaged builds register Windows App Execution Aliases for four common
+Unix-style commands. They use Windows files, paths, and APIs without requiring
+WSL:
+
+| Command | Windows behavior |
+|---------|------------------|
+| `cp` | Copies files and directories, including `-r`/`-R`, `-f`, and `-n` options |
+| `grep` | Searches files or standard input, with common options such as `-i`, `-n`, `-r`, `-F`, `-c`, and `-l` |
+| `mv` | Moves files and directories, including cross-volume file moves |
+| `rm` | Moves files and `-r`/`-R` directories to the Windows Recycle Bin |
+
+Command Prompt resolves the aliases without the `.exe` suffix. PowerShell
+already defines `cp`, `mv`, and `rm` as aliases for its own cmdlets, so use
+`cp.exe`, `mv.exe`, and `rm.exe` there to select Terminal's packaged commands.
+`grep` has no default PowerShell alias and resolves directly.
+
+`rm` never performs a permanent delete. It requires `-r` for directories,
+ignores missing paths only with `-f`, and refuses to remove `.`, `..`, or a
+filesystem root.
+
+When command-not-found integration recognizes another curated Unix executable,
+Terminal still offers explicit WSL execution and installation quick fixes.
+Selecting a quick fix inserts it for review rather than executing it
+automatically.
+
+For Linux-style command-line navigation across all hosted shells, `Ctrl+A`
+sends the Home sequence and `Ctrl+E` sends the End sequence. These are global
+Terminal bindings, so applications receive Home or End instead of the original
+control characters.
 
 ---
 

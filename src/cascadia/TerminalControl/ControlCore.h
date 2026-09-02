@@ -24,6 +24,8 @@
 #include "../../cascadia/TerminalCore/Terminal.hpp"
 #include "../../renderer/inc/FontInfoDesired.hpp"
 
+#include <mutex>
+
 namespace Microsoft::Console::Render::Atlas
 {
     class AtlasEngine;
@@ -243,8 +245,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         hstring ReadEntireBuffer() const;
         Control::CommandHistoryContext CommandHistory() const;
-        bool QuickFixesAvailable() const noexcept;
+        bool QuickFixesAvailable() const;
+        void BeginQuickFixRequest();
         void UpdateQuickFixes(const Windows::Foundation::Collections::IVector<hstring>& quickFixes);
+        bool TryUpdateQuickFixes(const Windows::Foundation::Collections::IVector<hstring>& quickFixes);
 
         void AdjustOpacity(const float opacity, const bool relative);
 
@@ -416,6 +420,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         IControlAppearance _unfocusedAppearance{ nullptr };
         Core::ICoreScheme _focusedColorSchemeOverride{ nullptr };
         til::point _contextMenuBufferPosition{ 0, 0 };
+        mutable std::mutex _quickFixMutex;
         Windows::Foundation::Collections::IVector<hstring> _cachedQuickFixes{ nullptr };
         ::Search _searcher;
         std::optional<interval_tree::IntervalTree<til::point, size_t>::interval> _lastHoveredInterval;

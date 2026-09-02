@@ -627,6 +627,10 @@
         { "command": "restartConnection", "id": "Terminal.RestartConnection" },
         { "command": { "action": "splitPane", "type": "snippets" }, "id": "Terminal.OpenSnippetsPane", "name": { "key": "SnippetsPaneCommandName" } },
 
+        // Command-line Navigation
+        { "command": { "action": "sendInput", "input": "\u001b[H" }, "id": "Terminal.MoveToBeginningOfLine" },
+        { "command": { "action": "sendInput", "input": "\u001b[F" }, "id": "Terminal.MoveToEndOfLine" },
+
         // Clipboard Integration
         { "command": { "action": "copy", "singleLine": false }, "id": "Terminal.CopyToClipboard" },
         { "command": "paste", "id": "Terminal.PasteFromClipboard" },
@@ -774,6 +778,10 @@
         { "keys": "alt+right", "id": "Terminal.MoveFocusRight" },
         { "keys": "alt+up", "id": "Terminal.MoveFocusUp" },
         { "keys": "ctrl+alt+left", "id": "Terminal.MoveFocusPrevious" },
+
+        // Command-line Navigation
+        { "keys": "ctrl+a", "id": "Terminal.MoveToBeginningOfLine" },
+        { "keys": "ctrl+e", "id": "Terminal.MoveToEndOfLine" },
 
         // Clipboard Integration
         { "keys": "ctrl+shift+c", "id": "Terminal.CopyToClipboard" },

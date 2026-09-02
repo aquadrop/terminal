@@ -1911,6 +1911,19 @@ namespace SettingsModelUnitTests
         const auto settings{ CascadiaSettings::LoadDefaults() };
         VERIFY_ARE_EQUAL(settings.ActiveProfiles().Size(), settings.AllProfiles().Size());
         VERIFY_ARE_EQUAL(settings.AllProfiles().Size(), 2u);
+
+        const auto verifyLineNavigationBinding = [&](const int32_t vkey, const std::wstring_view expectedInput) {
+            const auto command = settings.ActionMap().GetActionByKeyChord(
+                { VirtualKeyModifiers::Control, vkey, 0 });
+            VERIFY_IS_NOT_NULL(command);
+            VERIFY_ARE_EQUAL(ShortcutAction::SendInput, command.ActionAndArgs().Action());
+
+            const auto args = command.ActionAndArgs().Args().as<SendInputArgs>();
+            VERIFY_ARE_EQUAL(expectedInput, std::wstring_view{ args.Input() });
+        };
+
+        verifyLineNavigationBinding('A', L"\x1b[H");
+        verifyLineNavigationBinding('E', L"\x1b[F");
     }
 
     void DeserializationTests::TestInheritedCommand()

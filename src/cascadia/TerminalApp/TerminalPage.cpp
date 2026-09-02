@@ -15,6 +15,7 @@
 #include "../../types/inc/utils.hpp"
 #include "../TerminalSettingsAppAdapterLib/TerminalSettings.h"
 #include "App.h"
+#include "CommandCompatibility.h"
 #include "DebugTapConnection.h"
 #include "MarkdownPaneContent.h"
 #include "Remoting.h"
@@ -2062,7 +2063,26 @@ namespace winrt::TerminalApp::implementation
         });
 
         term.ShowWindowChanged({ get_weak(), &TerminalPage::_ShowWindowChangedHandler });
-        term.SearchMissingCommand({ get_weak(), &TerminalPage::_SearchMissingCommandHandler });
+        std::shared_ptr<::TerminalApp::QuickFixRequestTracker> quickFixRequestTracker;
+        if constexpr (Feature_QuickFix::IsEnabled())
+        {
+            quickFixRequestTracker = std::make_shared<::TerminalApp::QuickFixRequestTracker>();
+            term.SearchMissingCommand([weak = get_weak(), quickFixRequestTracker](const auto& sender, const auto& args) {
+                const auto originatingTerm = sender.template try_as<TermControl>();
+                if (!originatingTerm)
+                {
+                    return;
+                }
+
+                const auto requestId = quickFixRequestTracker->Start([&]() {
+                    originatingTerm.UpdateWinGetSuggestions(winrt::multi_threaded_vector<hstring>());
+                });
+                if (const auto page = weak.get())
+                {
+                    page->_SearchMissingCommandHandler(sender, args, quickFixRequestTracker, requestId);
+                }
+            });
+        }
         term.WindowSizeChanged({ get_weak(), &TerminalPage::_WindowSizeChanged });
 
         // Don't even register for the event if the feature is compiled off.
@@ -2085,10 +2105,10 @@ namespace winrt::TerminalApp::implementation
         });
         if constexpr (Feature_QuickFix::IsEnabled())
         {
-            term.QuickFixMenu().Opening([weak = get_weak(), weakTerm](auto&& sender, auto&& /*args*/) {
+            term.QuickFixMenu().Opening([weak = get_weak(), weakTerm, quickFixRequestTracker](auto&& sender, auto&& /*args*/) {
                 if (const auto& page{ weak.get() })
                 {
-                    page->_PopulateQuickFixMenu(weakTerm.get(), sender.try_as<Controls::MenuFlyout>());
+                    page->_PopulateQuickFixMenu(weakTerm.get(), sender.try_as<Controls::MenuFlyout>(), quickFixRequestTracker);
                 }
             });
         }
@@ -3545,49 +3565,96 @@ namespace winrt::TerminalApp::implementation
         co_return pkgList;
     }
 
-    Windows::Foundation::IAsyncAction TerminalPage::_SearchMissingCommandHandler(const IInspectable /*sender*/, const Microsoft::Terminal::Control::SearchMissingCommandEventArgs args)
+    safe_void_coroutine TerminalPage::_SearchMissingCommandHandler(const IInspectable sender,
+                                                                   const Microsoft::Terminal::Control::SearchMissingCommandEventArgs args,
+                                                                   std::shared_ptr<::TerminalApp::QuickFixRequestTracker> requestTracker,
+                                                                   const uint64_t requestId)
     {
         if (!Feature_QuickFix::IsEnabled())
         {
             co_return;
         }
 
+        const auto term = sender.try_as<TermControl>();
+        if (!term)
+        {
+            co_return;
+        }
+
         const auto weak = get_weak();
+        const winrt::weak_ref<TermControl> weakTerm{ term };
         const auto dispatcher = Dispatcher();
 
-        // All of the code until resume_foreground is static and
-        // doesn't touch `this`, so we don't need weak/strong_ref.
+        std::vector<hstring> suggestions;
+        for (auto&& suggestion : ::TerminalApp::CommandCompatibility::GetQuickFixes(args.MissingCommand()))
+        {
+            suggestions.emplace_back(std::move(suggestion));
+        }
+
+        {
+            co_await wil::resume_foreground(dispatcher);
+            const auto strong = weak.get();
+            const auto originatingTerm = weakTerm.get();
+            if (!strong || !originatingTerm)
+            {
+                co_return;
+            }
+
+            if (!requestTracker->IsCurrent(requestId))
+            {
+                co_return;
+            }
+
+            auto initialSuggestions{ suggestions };
+            if (!requestTracker->RunIfCurrent(requestId, [&]() {
+                    originatingTerm.UpdateWinGetSuggestions(single_threaded_vector<hstring>(std::move(initialSuggestions)));
+                }))
+            {
+                co_return;
+            }
+            originatingTerm.RefreshQuickFixMenu();
+        }
+
         co_await winrt::resume_background();
 
-        // no packages were found, nothing to suggest
         const auto pkgList = co_await _FindPackageAsync(args.MissingCommand());
         if (!pkgList || pkgList.Size() == 0)
         {
             co_return;
         }
 
-        std::vector<hstring> suggestions;
-        suggestions.reserve(pkgList.Size());
+        suggestions.reserve(suggestions.size() + pkgList.Size());
+        std::unordered_set<std::wstring> uniqueSuggestions;
+        for (const auto& suggestion : suggestions)
+        {
+            uniqueSuggestions.emplace(suggestion.c_str());
+        }
+
         for (const auto& pkg : pkgList)
         {
             // --id and --source ensure we don't collide with another package catalog
-            suggestions.emplace_back(fmt::format(FMT_COMPILE(L"winget install --id {} -s winget"), pkg.CatalogPackage().Id()));
+            auto suggestion = fmt::format(FMT_COMPILE(L"winget install --id {} -s winget"), pkg.CatalogPackage().Id());
+            if (uniqueSuggestions.emplace(suggestion).second)
+            {
+                suggestions.emplace_back(std::move(suggestion));
+            }
         }
 
         co_await wil::resume_foreground(dispatcher);
         const auto strong = weak.get();
-        if (!strong)
+        const auto originatingTerm = weakTerm.get();
+        if (!strong || !originatingTerm)
         {
             co_return;
         }
 
-        auto term = _GetActiveControl();
-        if (!term)
+        if (!requestTracker->RunIfCurrent(requestId, [&]() {
+                originatingTerm.UpdateWinGetSuggestions(single_threaded_vector<hstring>(std::move(suggestions)));
+            }))
         {
             co_return;
         }
-        term.UpdateWinGetSuggestions(single_threaded_vector<hstring>(std::move(suggestions)));
-        term.RefreshQuickFixMenu();
+        originatingTerm.RefreshQuickFixMenu();
     }
 
     void TerminalPage::_WindowSizeChanged(const IInspectable sender, const Microsoft::Terminal::Control::WindowSizeChangedEventArgs args)
@@ -5720,7 +5787,8 @@ namespace winrt::TerminalApp::implementation
     }
 
     void TerminalPage::_PopulateQuickFixMenu(const TermControl& control,
-                                             const Controls::MenuFlyout& menu)
+                                             const Controls::MenuFlyout& menu,
+                                             std::shared_ptr<::TerminalApp::QuickFixRequestTracker> requestTracker)
     {
         if (!control || !menu)
         {
@@ -5731,21 +5799,24 @@ namespace winrt::TerminalApp::implementation
         // ShortcutActionDispatch. Used below to wire up each menu entry to the
         // respective action. Then clear the quick fix menu.
         auto weak = get_weak();
-        auto makeCallback = [weak](const hstring& suggestion) {
-            return [weak, suggestion](auto&&, auto&&) {
-                if (auto page{ weak.get() })
+        const winrt::weak_ref<TermControl> weakTerm{ control };
+        const auto requestId = requestTracker->Current();
+        auto makeCallback = [weak, weakTerm, requestTracker, requestId](const hstring& suggestion) {
+            return [weak, weakTerm, requestTracker, requestId, suggestion](auto&&, auto&&) {
+                const auto page = weak.get();
+                const auto originatingTerm = weakTerm.get();
+                if (page && originatingTerm &&
+                    requestTracker->InvalidateIfCurrent(requestId, [&]() {
+                        originatingTerm.ClearQuickFix();
+                    }))
                 {
                     const auto actionAndArgs = ActionAndArgs{ ShortcutAction::SendInput, SendInputArgs{ hstring{ L"\u0003" } + suggestion } };
-                    page->_actionDispatch->DoAction(actionAndArgs);
-                    if (auto ctrl = page->_GetActiveControl())
-                    {
-                        ctrl.ClearQuickFix();
-                    }
+                    page->_actionDispatch->DoAction(originatingTerm, actionAndArgs);
 
                     TraceLoggingWrite(
                         g_hTerminalAppProvider,
                         "QuickFixSuggestionUsed",
-                        TraceLoggingDescription("Event emitted when a winget suggestion from is used"),
+                        TraceLoggingDescription("Event emitted when a quick fix suggestion is used"),
                         TraceLoggingValue("QuickFixMenu", "Source"),
                         TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
                         TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
