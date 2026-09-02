@@ -180,18 +180,30 @@ _Learn more about the [types of Windows Terminal distributions](https://learn.mi
 
 ## Unix-style command compatibility on Windows
 
-When command-not-found integration recognizes a curated Unix command, Windows
-Terminal offers a quick fix instead of silently changing shell behavior.
-Common commands such as `cp`, `mv`, and `grep` prioritize the Windows-native
-PowerShell equivalents `Copy-Item`, `Move-Item`, and `Select-String`. Other
-supported executables can be run through WSL when an installed distribution
-provides them.
+Packaged builds register Windows App Execution Aliases for four common
+Unix-style commands. They use Windows files, paths, and APIs without requiring
+WSL:
 
-`rm` is handled specially for Windows safety. Its quick fix accepts one or more
-literal file or directory paths and moves them to the Windows Recycle Bin; it
-never delegates deletion to WSL and does not use `Remove-Item`, which would
-permanently delete the items. The inserted command can be reviewed or edited
-before execution, like every Terminal quick fix.
+| Command | Windows behavior |
+|---------|------------------|
+| `cp` | Copies files and directories, including `-r`/`-R`, `-f`, and `-n` options |
+| `grep` | Searches files or standard input, with common options such as `-i`, `-n`, `-r`, `-F`, `-c`, and `-l` |
+| `mv` | Moves files and directories, including cross-volume file moves |
+| `rm` | Moves files and `-r`/`-R` directories to the Windows Recycle Bin |
+
+Command Prompt resolves the aliases without the `.exe` suffix. PowerShell
+already defines `cp`, `mv`, and `rm` as aliases for its own cmdlets, so use
+`cp.exe`, `mv.exe`, and `rm.exe` there to select Terminal's packaged commands.
+`grep` has no default PowerShell alias and resolves directly.
+
+`rm` never performs a permanent delete. It requires `-r` for directories,
+ignores missing paths only with `-f`, and refuses to remove `.`, `..`, or a
+filesystem root.
+
+When command-not-found integration recognizes another curated Unix executable,
+Terminal still offers explicit WSL execution and installation quick fixes.
+Selecting a quick fix inserts it for review rather than executing it
+automatically.
 
 ---
 

@@ -83,6 +83,9 @@
     <ProjectReference Include="$(OpenConsoleDir)src\cascadia\wt\wt.vcxproj">
       <Project>{506fd703-baa7-4f6e-9361-64f550ec8fca}</Project>
     </ProjectReference>
+    <ProjectReference Include="$(OpenConsoleDir)src\cascadia\UnixCommandShim\UnixCommandShim.vcxproj">
+      <Project>{A8C61F77-1413-4B30-B031-1716A231C791}</Project>
+    </ProjectReference>
     <ProjectReference Include="$(OpenConsoleDir)src\host\exe\Host.EXE.vcxproj">
       <Project>{9CBD7DFA-1754-4A9D-93D7-857A9D17CB1B}</Project>
     </ProjectReference>

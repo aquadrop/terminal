@@ -16,7 +16,7 @@ namespace TerminalAppUnitTests
 
         TEST_METHOD(CommonLinuxCommandsUseWsl);
         TEST_METHOD(CommonFileCommandsPreferWindowsBehavior);
-        TEST_METHOD(RemoveUsesRecycleBin);
+        TEST_METHOD(RemoveHasNoUnsafeFallback);
         TEST_METHOD(QuickFixRequestsAreTrackedPerControl);
         TEST_METHOD(ShellBuiltinsHaveNoBuiltInFix);
         TEST_METHOD(UnsafeOrUnknownCommandsHaveNoBuiltInFix);
@@ -25,7 +25,7 @@ namespace TerminalAppUnitTests
     void CommandCompatibilityTests::CommonLinuxCommandsUseWsl()
     {
         const auto commands = ::TerminalApp::CommandCompatibility::GetSupportedCommands();
-        VERIFY_ARE_EQUAL(83u, commands.size());
+        VERIFY_ARE_EQUAL(82u, commands.size());
         VERIFY_IS_TRUE(std::find(commands.begin(), commands.end(), std::wstring_view{ L"head" }) != commands.end());
         VERIFY_IS_TRUE(std::find(commands.begin(), commands.end(), std::wstring_view{ L"vim" }) != commands.end());
 
@@ -67,17 +67,9 @@ namespace TerminalAppUnitTests
                 VERIFY_IS_TRUE(suggestion.find_first_of(L"\r\n") == std::wstring::npos);
             }
 
-            if (command == L"rm")
-            {
-                VERIFY_ARE_EQUAL(1u, suggestions.size());
-                VERIFY_IS_TRUE(suggestions.at(0).find(L"SendToRecycleBin") != std::wstring::npos);
-            }
-            else
-            {
-                const auto wslSuggestion = std::find(suggestions.begin(), suggestions.end(), expected);
-                VERIFY_IS_TRUE(wslSuggestion != suggestions.end());
-                VERIFY_IS_TRUE(suggestions.back() == L"wsl.exe --install");
-            }
+            const auto wslSuggestion = std::find(suggestions.begin(), suggestions.end(), expected);
+            VERIFY_IS_TRUE(wslSuggestion != suggestions.end());
+            VERIFY_IS_TRUE(suggestions.back() == L"wsl.exe --install");
         }
     }
 
@@ -97,19 +89,10 @@ namespace TerminalAppUnitTests
         }
     }
 
-    void CommandCompatibilityTests::RemoveUsesRecycleBin()
+    void CommandCompatibilityTests::RemoveHasNoUnsafeFallback()
     {
         const auto suggestions = ::TerminalApp::CommandCompatibility::GetQuickFixes(L"rm");
-        VERIFY_ARE_EQUAL(1u, suggestions.size());
-
-        const auto& command = suggestions.front();
-        VERIFY_IS_TRUE(command.starts_with(L"powershell.exe -NoProfile -Command"));
-        VERIFY_IS_TRUE(command.find(L"ValueFromRemainingArguments=$true") != std::wstring::npos);
-        VERIFY_IS_TRUE(command.find(L"DeleteFile") != std::wstring::npos);
-        VERIFY_IS_TRUE(command.find(L"DeleteDirectory") != std::wstring::npos);
-        VERIFY_IS_TRUE(command.find(L"SendToRecycleBin") != std::wstring::npos);
-        VERIFY_IS_TRUE(command.find(L"Remove-Item") == std::wstring::npos);
-        VERIFY_IS_TRUE(command.find(L"wsl") == std::wstring::npos);
+        VERIFY_IS_TRUE(suggestions.empty());
     }
 
     void CommandCompatibilityTests::QuickFixRequestsAreTrackedPerControl()

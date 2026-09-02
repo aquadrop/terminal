@@ -6,10 +6,6 @@
 
 namespace
 {
-    constexpr std::wstring_view RecycleCommand{
-        LR"(powershell.exe -NoProfile -Command '& { param([Parameter(Mandatory=$true, ValueFromRemainingArguments=$true)][string[]]$Path) Add-Type -AssemblyName Microsoft.VisualBasic; foreach ($item in $Path) { $resolved = (Resolve-Path -LiteralPath $item -ErrorAction Stop).Path; if ([System.IO.Directory]::Exists($resolved)) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($resolved, [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs, [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin) } else { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($resolved, [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs, [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin) } } }')"
-    };
-
     // Shell built-ins are intentionally excluded because wsl.exe --exec cannot
     // preserve changes such as the working directory or environment.
     constexpr std::wstring_view LinuxCommands[]{
@@ -63,7 +59,6 @@ namespace
         L"pwd",
         L"readlink",
         L"realpath",
-        L"rm",
         L"rmdir",
         L"scp",
         L"sed",
@@ -110,14 +105,6 @@ std::vector<std::wstring> TerminalApp::CommandCompatibility::GetQuickFixes(const
     {
         if (til::equals_insensitive_ascii(missingCommand, command))
         {
-            // Prefer Windows-native behavior for common Unix command names.
-            // rm is deliberately never delegated to WSL, where deletion would
-            // bypass the Windows Recycle Bin.
-            if (command == L"rm")
-            {
-                return { std::wstring{ RecycleCommand } };
-            }
-
             std::wstring wslCommand{ L"wsl.exe --exec " };
             wslCommand.append(command);
 
