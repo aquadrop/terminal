@@ -23,6 +23,8 @@
 #include <system_error>
 #include <vector>
 
+#include "CoreFileCommands.h"
+
 using Microsoft::WRL::ComPtr;
 
 namespace
@@ -1971,9 +1973,21 @@ int wmain(const int argc, wchar_t* argv[])
     {
         return copyCommand(arguments);
     }
+    if (command == L"cat")
+    {
+        return Terminal::UnixCommandShim::Cat(arguments);
+    }
+    if (command == L"du")
+    {
+        return Terminal::UnixCommandShim::Du(arguments);
+    }
     if (command == L"grep")
     {
         return grepCommand(arguments);
+    }
+    if (command == L"head")
+    {
+        return Terminal::UnixCommandShim::Head(arguments);
     }
     if (command == L"mv")
     {
@@ -1982,6 +1996,18 @@ int wmain(const int argc, wchar_t* argv[])
     if (command == L"rm")
     {
         return recycleCommand(arguments);
+    }
+    if (command == L"tail")
+    {
+        return Terminal::UnixCommandShim::Tail(arguments);
+    }
+    if (command == L"touch")
+    {
+        return Terminal::UnixCommandShim::Touch(arguments);
+    }
+    if (command == L"wc")
+    {
+        return Terminal::UnixCommandShim::Wc(arguments);
     }
     if (command == L"wt" || command == L"wtd")
     {

@@ -161,10 +161,16 @@
         <uap3:Extension Category="windows.appExecutionAlias" Executable="wtcmd.exe" EntryPoint="Windows.FullTrustApplication">
           <uap3:AppExecutionAlias>
             <desktop:ExecutionAlias Alias="wt.exe" />
+            <desktop:ExecutionAlias Alias="cat.exe" />
             <desktop:ExecutionAlias Alias="cp.exe" />
+            <desktop:ExecutionAlias Alias="du.exe" />
             <desktop:ExecutionAlias Alias="grep.exe" />
+            <desktop:ExecutionAlias Alias="head.exe" />
             <desktop:ExecutionAlias Alias="mv.exe" />
             <desktop:ExecutionAlias Alias="rm.exe" />
+            <desktop:ExecutionAlias Alias="tail.exe" />
+            <desktop:ExecutionAlias Alias="touch.exe" />
+            <desktop:ExecutionAlias Alias="wc.exe" />
           </uap3:AppExecutionAlias>
         </uap3:Extension>
         <uap3:Extension Category="windows.appExtensionHost">

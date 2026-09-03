@@ -180,21 +180,31 @@ _Learn more about the [types of Windows Terminal distributions](https://learn.mi
 
 ## Unix-style command compatibility on Windows
 
-Packaged builds register Windows App Execution Aliases for four common
+Packaged builds register Windows App Execution Aliases for ten common
 Unix-style commands. They use Windows files, paths, and APIs without requiring
 WSL:
 
 | Command | Windows behavior |
 |---------|------------------|
+| `cat` | Concatenates files or standard input, with `-n`, `-b`, and `-s` options |
 | `cp` | Copies files and directories, including `-r`/`-R`, `-f`, and `-n` options |
+| `du` | Reports allocated or apparent sizes, including combined options such as `du -chs *` |
 | `grep` | Searches files or standard input, with common options such as `-i`, `-n`, `-r`, `-F`, `-c`, and `-l` |
+| `head` | Prints leading lines or bytes with `-n` and `-c` |
 | `mv` | Moves files and directories, including cross-volume file moves |
 | `rm` | Moves files and `-r`/`-R` directories to the Windows Recycle Bin |
+| `tail` | Prints trailing lines or bytes with `-n` and `-c` |
+| `touch` | Creates files or updates access and modification timestamps |
+| `wc` | Counts lines, words, characters, and bytes |
 
 Command Prompt resolves the aliases without the `.exe` suffix. PowerShell
-already defines `cp`, `mv`, and `rm` as aliases for its own cmdlets, so use
-`cp.exe`, `mv.exe`, and `rm.exe` there to select Terminal's packaged commands.
-`grep` has no default PowerShell alias and resolves directly.
+already defines `cat`, `cp`, `mv`, and `rm` as aliases for its own cmdlets, so
+use `cat.exe`, `cp.exe`, `mv.exe`, and `rm.exe` there to select Terminal's
+packaged commands. The other names resolve directly unless another application
+appears earlier on `PATH`.
+
+The packaged file tools expand `*` and `?` in the final path component because
+Windows shells do not consistently perform native wildcard expansion.
 
 `rm` never performs a permanent delete. It requires `-r` for directories,
 ignores missing paths only with `-f`, and refuses to remove `.`, `..`, or a
