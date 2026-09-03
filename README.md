@@ -213,8 +213,10 @@ control characters.
 Generated PowerShell profiles also add a packaged compatibility module to
 `PSModulePath` and import it during startup. Its PSReadLine handler expands
 `!!` to the previous command before PowerShell parses the line, including any
-appended arguments. PowerShell already supports `cd -` for switching back to
-the previous directory.
+appended arguments. It also expands numeric history events such as `!7` to
+command ID 7. As in Bash, `history 7` displays history rather than executing
+it. PowerShell already supports `cd -` for switching back to the previous
+directory.
 
 ---
 
