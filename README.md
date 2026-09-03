@@ -211,8 +211,10 @@ Terminal bindings, so applications receive Home or End instead of the original
 control characters.
 
 Generated PowerShell profiles also add a packaged compatibility module to
-`PSModulePath`. This provides `!!` as an alias for `Invoke-History`; PowerShell
-already supports `cd -` for switching back to the previous directory.
+`PSModulePath` and import it during startup. Its PSReadLine handler expands
+`!!` to the previous command before PowerShell parses the line, including any
+appended arguments. PowerShell already supports `cd -` for switching back to
+the previous directory.
 
 ---
 

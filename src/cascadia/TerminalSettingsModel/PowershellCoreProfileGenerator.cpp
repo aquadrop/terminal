@@ -346,6 +346,10 @@ void PowershellCoreProfileGenerator::GenerateProfiles(std::vector<winrt::com_ptr
         quotedCommandline.push_back(L'"');
         quotedCommandline.append(unquotedCommandline);
         quotedCommandline.push_back(L'"');
+        if (!compatibilityModulePath.empty())
+        {
+            quotedCommandline.append(LR"( -NoExit -Command "Import-Module Terminal.UnixCompatibility")");
+        }
         profile->Commandline(winrt::hstring{ quotedCommandline });
 
         profile->StartingDirectory(winrt::hstring{ DEFAULT_STARTING_DIRECTORY });

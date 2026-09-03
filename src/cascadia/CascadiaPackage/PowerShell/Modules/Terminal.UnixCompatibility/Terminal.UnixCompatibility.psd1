@@ -10,5 +10,5 @@
     FunctionsToExport = @()
     CmdletsToExport = @()
     VariablesToExport = @()
-    AliasesToExport = @('!!')
+    AliasesToExport = @()
 }
