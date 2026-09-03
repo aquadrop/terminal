@@ -210,6 +210,14 @@ sends the Home sequence and `Ctrl+E` sends the End sequence. These are global
 Terminal bindings, so applications receive Home or End instead of the original
 control characters.
 
+Generated PowerShell profiles also add a packaged compatibility module to
+`PSModulePath` and import it during startup. Its PSReadLine handler expands
+`!!` to the previous command before PowerShell parses the line, including any
+appended arguments. It also expands numeric history events such as `!7` to
+command ID 7. As in Bash, `history 7` displays history rather than executing
+it. PowerShell already supports `cd -` for switching back to the previous
+directory.
+
 ---
 
 ## Terminal & Console Overview
