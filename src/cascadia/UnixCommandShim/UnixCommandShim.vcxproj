@@ -25,7 +25,14 @@
   </ItemDefinitionGroup>
 
   <ItemGroup>
+    <ClCompile Include="CoreFileCommands.cpp" />
     <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CoreFileCommands.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="wtcmd.exe.manifest" />
   </ItemGroup>
 
   <Import Project="$(OpenConsoleDir)src\common.build.post.props" />
