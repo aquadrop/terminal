@@ -3,6 +3,15 @@
 
 Import-Module PSReadLine
 
+$commandRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\LinuxCommands'))
+foreach ($command in 'cat', 'cp', 'du', 'grep', 'head', 'mv', 'rm', 'tail', 'touch', 'wc') {
+    $commandPath = Join-Path $commandRoot "$command.exe"
+    if (-not (Test-Path -LiteralPath $commandPath -PathType Leaf)) {
+        throw "Linux compatibility command is missing: $commandPath"
+    }
+    Set-Alias -Name $command -Value $commandPath -Scope Global -Option AllScope -Force -ErrorAction Stop
+}
+
 function Resolve-TerminalHistoryEvent {
     param(
         [Parameter(Mandatory)]
