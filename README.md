@@ -180,9 +180,11 @@ _Learn more about the [types of Windows Terminal distributions](https://learn.mi
 
 ## Unix-style command compatibility on Windows
 
-Packaged builds register Windows App Execution Aliases for ten common
-Unix-style commands. They use Windows files, paths, and APIs without requiring
-WSL:
+Packaged builds include a **Linux** profile that is visible by default without
+replacing the user's existing default profile. It launches the preferred
+PowerShell installation with a private command directory and compatibility
+module, enabling ten Unix-style commands that use Windows files, paths, and
+APIs without requiring WSL:
 
 | Command | Windows behavior |
 |---------|------------------|
@@ -197,11 +199,9 @@ WSL:
 | `touch` | Creates files or updates access and modification timestamps |
 | `wc` | Counts lines, words, characters, and bytes |
 
-Command Prompt resolves the aliases without the `.exe` suffix. PowerShell
-already defines `cat`, `cp`, `mv`, and `rm` as aliases for its own cmdlets, so
-use `cat.exe`, `cp.exe`, `mv.exe`, and `rm.exe` there to select Terminal's
-packaged commands. The other names resolve directly unless another application
-appears earlier on `PATH`.
+Inside the Linux profile, every command resolves without the `.exe` suffix.
+The compatibility module redirects PowerShell's existing `cat`, `cp`, `mv`,
+and `rm` aliases to the packaged commands.
 
 The packaged file tools expand `*` and `?` in the final path component because
 Windows shells do not consistently perform native wildcard expansion.
@@ -209,6 +209,11 @@ Windows shells do not consistently perform native wildcard expansion.
 `rm` never performs a permanent delete. It requires `-r` for directories,
 ignores missing paths only with `-f`, and refuses to remove `.`, `..`, or a
 filesystem root.
+
+The profile can be hidden or selected as the default from Terminal Settings.
+When it is hidden and a normal PowerShell or Command Prompt profile is used,
+the private command directory and compatibility module are not loaded, restoring
+the shell behavior that existed before the Linux profile.
 
 When command-not-found integration recognizes another curated Unix executable,
 Terminal still offers explicit WSL execution and installation quick fixes.
@@ -220,13 +225,11 @@ sends the Home sequence and `Ctrl+E` sends the End sequence. These are global
 Terminal bindings, so applications receive Home or End instead of the original
 control characters.
 
-Generated PowerShell profiles also add a packaged compatibility module to
-`PSModulePath` and import it during startup. Its PSReadLine handler expands
-`!!` to the previous command before PowerShell parses the line, including any
-appended arguments. It also expands numeric history events such as `!7` to
-command ID 7. As in Bash, `history 7` displays history rather than executing
-it. PowerShell already supports `cd -` for switching back to the previous
-directory.
+The Linux profile's PSReadLine handler expands `!!` to the previous command
+before PowerShell parses the line, including any appended arguments. It also
+expands numeric history events such as `!7` to command ID 7. As in Bash,
+`history 7` displays history rather than executing it. PowerShell already
+supports `cd -` for switching back to the previous directory.
 
 ---
 

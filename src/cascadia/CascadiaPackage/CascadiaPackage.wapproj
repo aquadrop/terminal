@@ -121,6 +121,46 @@
         <!-- Replace the filename for wt/wtd.exe with the one that the manifest wants. -->
         <TargetPath Condition="'%(Filename)' == 'wt' and '%(Extension)' == '.exe'">$(OCExecutionAliasName).exe</TargetPath>
       </_FilteredNonWapProjProjectOutput>
+      <_FilteredNonWapProjProjectOutput Include="@(_TemporaryFilteredWapProjOutput)" Condition="'%(Filename)' == 'wtcmd' and '%(Extension)' == '.exe'">
+        <SourceProject></SourceProject>
+        <TargetPath>LinuxCommands\cat.exe</TargetPath>
+      </_FilteredNonWapProjProjectOutput>
+      <_FilteredNonWapProjProjectOutput Include="@(_TemporaryFilteredWapProjOutput)" Condition="'%(Filename)' == 'wtcmd' and '%(Extension)' == '.exe'">
+        <SourceProject></SourceProject>
+        <TargetPath>LinuxCommands\cp.exe</TargetPath>
+      </_FilteredNonWapProjProjectOutput>
+      <_FilteredNonWapProjProjectOutput Include="@(_TemporaryFilteredWapProjOutput)" Condition="'%(Filename)' == 'wtcmd' and '%(Extension)' == '.exe'">
+        <SourceProject></SourceProject>
+        <TargetPath>LinuxCommands\du.exe</TargetPath>
+      </_FilteredNonWapProjProjectOutput>
+      <_FilteredNonWapProjProjectOutput Include="@(_TemporaryFilteredWapProjOutput)" Condition="'%(Filename)' == 'wtcmd' and '%(Extension)' == '.exe'">
+        <SourceProject></SourceProject>
+        <TargetPath>LinuxCommands\grep.exe</TargetPath>
+      </_FilteredNonWapProjProjectOutput>
+      <_FilteredNonWapProjProjectOutput Include="@(_TemporaryFilteredWapProjOutput)" Condition="'%(Filename)' == 'wtcmd' and '%(Extension)' == '.exe'">
+        <SourceProject></SourceProject>
+        <TargetPath>LinuxCommands\head.exe</TargetPath>
+      </_FilteredNonWapProjProjectOutput>
+      <_FilteredNonWapProjProjectOutput Include="@(_TemporaryFilteredWapProjOutput)" Condition="'%(Filename)' == 'wtcmd' and '%(Extension)' == '.exe'">
+        <SourceProject></SourceProject>
+        <TargetPath>LinuxCommands\mv.exe</TargetPath>
+      </_FilteredNonWapProjProjectOutput>
+      <_FilteredNonWapProjProjectOutput Include="@(_TemporaryFilteredWapProjOutput)" Condition="'%(Filename)' == 'wtcmd' and '%(Extension)' == '.exe'">
+        <SourceProject></SourceProject>
+        <TargetPath>LinuxCommands\rm.exe</TargetPath>
+      </_FilteredNonWapProjProjectOutput>
+      <_FilteredNonWapProjProjectOutput Include="@(_TemporaryFilteredWapProjOutput)" Condition="'%(Filename)' == 'wtcmd' and '%(Extension)' == '.exe'">
+        <SourceProject></SourceProject>
+        <TargetPath>LinuxCommands\tail.exe</TargetPath>
+      </_FilteredNonWapProjProjectOutput>
+      <_FilteredNonWapProjProjectOutput Include="@(_TemporaryFilteredWapProjOutput)" Condition="'%(Filename)' == 'wtcmd' and '%(Extension)' == '.exe'">
+        <SourceProject></SourceProject>
+        <TargetPath>LinuxCommands\touch.exe</TargetPath>
+      </_FilteredNonWapProjProjectOutput>
+      <_FilteredNonWapProjProjectOutput Include="@(_TemporaryFilteredWapProjOutput)" Condition="'%(Filename)' == 'wtcmd' and '%(Extension)' == '.exe'">
+        <SourceProject></SourceProject>
+        <TargetPath>LinuxCommands\wc.exe</TargetPath>
+      </_FilteredNonWapProjProjectOutput>
     </ItemGroup>
   </Target>
   <!-- Move all the PRI files that would be packaged into the appx into _PriFile so that

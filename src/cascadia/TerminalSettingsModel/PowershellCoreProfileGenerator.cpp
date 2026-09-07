@@ -23,18 +23,43 @@ static constexpr std::wstring_view POWERSHELL_ICON{ L"ms-appx:///ProfileIcons/pw
 static constexpr std::wstring_view POWERSHELL_PREVIEW_ICON{ L"ms-appx:///ProfileIcons/pwsh-preview.png" };
 static constexpr std::wstring_view GENERATOR_POWERSHELL_ICON{ L"ms-appx:///ProfileGeneratorIcons/PowerShell.png" };
 static constexpr std::wstring_view POWERSHELL_PREFERRED_PROFILE_NAME{ L"PowerShell" };
+static constexpr std::wstring_view LINUX_PROFILE_NAME{ L"Linux" };
+static constexpr std::wstring_view LINUX_PROFILE_GUID_SEED{ L"Windows Terminal Linux Compatibility" };
+static constexpr std::wstring_view LINUX_PROFILE_ICON{ L"ms-appx:///ProfileGeneratorIcons/WSL.png" };
 static constexpr std::wstring_view COMPATIBILITY_MODULE_RELATIVE_PATH{ LR"(PowerShell\Modules\Terminal.UnixCompatibility\Terminal.UnixCompatibility.psd1)" };
+static constexpr std::wstring_view LINUX_COMMANDS_RELATIVE_PATH{ L"LinuxCommands" };
 
 namespace
 {
-    std::wstring _getCompatibilityModulePath() noexcept
+    struct CompatibilityPaths
+    {
+        std::wstring manifest;
+        std::wstring modules;
+        std::wstring commands;
+
+        explicit operator bool() const noexcept
+        {
+            return !manifest.empty() && !modules.empty() && !commands.empty();
+        }
+    };
+
+    CompatibilityPaths _getCompatibilityPaths() noexcept
     try
     {
-        std::filesystem::path modulePath{ wil::GetModuleFileNameW<std::wstring>(nullptr) };
-        modulePath.replace_filename(COMPATIBILITY_MODULE_RELATIVE_PATH);
-        if (std::filesystem::exists(modulePath))
+        std::filesystem::path packageRoot{ wil::GetModuleFileNameW<std::wstring>(nullptr) };
+        packageRoot.remove_filename();
+
+        const auto moduleManifest = packageRoot / COMPATIBILITY_MODULE_RELATIVE_PATH;
+        const auto commandDirectory = packageRoot / LINUX_COMMANDS_RELATIVE_PATH;
+        if (std::filesystem::exists(moduleManifest) &&
+            std::filesystem::exists(commandDirectory / L"du.exe") &&
+            std::filesystem::exists(packageRoot / L"wtcmd.exe"))
         {
-            return modulePath.parent_path().parent_path().native();
+            return CompatibilityPaths{
+                moduleManifest.native(),
+                moduleManifest.parent_path().parent_path().native(),
+                commandDirectory.native(),
+            };
         }
         return {};
     }
@@ -332,7 +357,7 @@ std::wstring_view PowershellCoreProfileGenerator::GetIcon() const noexcept
 void PowershellCoreProfileGenerator::GenerateProfiles(std::vector<winrt::com_ptr<implementation::Profile>>& profiles) const
 {
     const auto psInstances = _collectPowerShellInstances();
-    const auto compatibilityModulePath = _getCompatibilityModulePath();
+    const auto compatibilityPaths = _getCompatibilityPaths();
     auto first = true;
 
     for (const auto& psI : psInstances)
@@ -346,22 +371,12 @@ void PowershellCoreProfileGenerator::GenerateProfiles(std::vector<winrt::com_ptr
         quotedCommandline.push_back(L'"');
         quotedCommandline.append(unquotedCommandline);
         quotedCommandline.push_back(L'"');
-        if (!compatibilityModulePath.empty())
-        {
-            quotedCommandline.append(LR"( -NoExit -Command "Import-Module Terminal.UnixCompatibility")");
-        }
         profile->Commandline(winrt::hstring{ quotedCommandline });
 
         profile->StartingDirectory(winrt::hstring{ DEFAULT_STARTING_DIRECTORY });
         profile->DefaultAppearance().DarkColorSchemeName(L"Campbell");
         profile->DefaultAppearance().LightColorSchemeName(L"Campbell");
         profile->Icon(winrt::hstring{ WI_IsFlagSet(psI.flags, PowerShellFlags::Preview) ? POWERSHELL_PREVIEW_ICON : POWERSHELL_ICON });
-        if (!compatibilityModulePath.empty())
-        {
-            auto environment = winrt::single_threaded_map<winrt::hstring, winrt::hstring>();
-            environment.Insert(L"PSModulePath", winrt::hstring{ compatibilityModulePath + L";%PSModulePath%" });
-            profile->EnvironmentVariables(environment);
-        }
 
         if (first)
         {
@@ -373,6 +388,46 @@ void PowershellCoreProfileGenerator::GenerateProfiles(std::vector<winrt::com_ptr
 
             first = false;
         }
+
+        profiles.emplace_back(std::move(profile));
+    }
+
+    if (!psInstances.empty() && compatibilityPaths)
+    {
+        const auto& preferredPowerShell = psInstances.front();
+        auto profile{ CreateDynamicProfile(LINUX_PROFILE_GUID_SEED) };
+        profile->Name(winrt::hstring{ LINUX_PROFILE_NAME });
+
+        const auto& executable = preferredPowerShell.executablePath.native();
+        std::wstring commandline;
+        commandline.reserve(executable.size() + 80);
+        commandline.push_back(L'"');
+        commandline.append(executable);
+        commandline.append(LR"(" -NoExit -Command "try { Import-Module -Name ')");
+        for (const auto ch : compatibilityPaths.manifest)
+        {
+            if (ch == L'\'')
+            {
+                commandline.append(L"''");
+            }
+            else
+            {
+                commandline.push_back(ch);
+            }
+        }
+        commandline.append(LR"(' -ErrorAction Stop } catch { Write-Error $_; exit 1 }")");
+        profile->Commandline(winrt::hstring{ commandline });
+
+        profile->StartingDirectory(winrt::hstring{ DEFAULT_STARTING_DIRECTORY });
+        profile->DefaultAppearance().DarkColorSchemeName(L"Campbell");
+        profile->DefaultAppearance().LightColorSchemeName(L"Campbell");
+        profile->Icon(winrt::hstring{ LINUX_PROFILE_ICON });
+        profile->Hidden(false);
+
+        auto environment = winrt::single_threaded_map<winrt::hstring, winrt::hstring>();
+        environment.Insert(L"PATH", winrt::hstring{ compatibilityPaths.commands + L";%PATH%" });
+        environment.Insert(L"PSModulePath", winrt::hstring{ compatibilityPaths.modules + L";%PSModulePath%" });
+        profile->EnvironmentVariables(environment);
 
         profiles.emplace_back(std::move(profile));
     }
