@@ -4,6 +4,7 @@
 #include "precomp.h"
 #include "../TerminalApp/CommandCompatibility.h"
 #include "../TerminalApp/QuickFixRequestTracker.h"
+#include "../UnixCommandShim/PathTranslation.h"
 
 using namespace WEX::TestExecution;
 
@@ -16,6 +17,7 @@ namespace TerminalAppUnitTests
 
         TEST_METHOD(CommonLinuxCommandsUseWsl);
         TEST_METHOD(CommonFileCommandsPreferWindowsBehavior);
+        TEST_METHOD(LinuxMountPathsMapToWindowsDrives);
         TEST_METHOD(RemoveHasNoUnsafeFallback);
         TEST_METHOD(QuickFixRequestsAreTrackedPerControl);
         TEST_METHOD(ShellBuiltinsHaveNoBuiltInFix);
@@ -86,6 +88,38 @@ namespace TerminalAppUnitTests
             const auto suggestions = ::TerminalApp::CommandCompatibility::GetQuickFixes(command);
             VERIFY_ARE_EQUAL(3u, suggestions.size());
             VERIFY_IS_TRUE(suggestions.front() == expectedSuggestion);
+        }
+    }
+
+    void CommandCompatibilityTests::LinuxMountPathsMapToWindowsDrives()
+    {
+        constexpr std::pair<std::wstring_view, std::wstring_view> convertedPaths[]{
+            { L"/mnt/c", LR"(C:\)" },
+            { L"/mnt/c/", LR"(C:\)" },
+            { L"/mnt/c/my_project", LR"(C:\my_project)" },
+            { L"/mnt/C/path with spaces/file.txt", LR"(C:\path with spaces\file.txt)" },
+            { L"/mnt/z/logs/*.txt", LR"(Z:\logs\*.txt)" },
+        };
+        for (const auto& [input, expected] : convertedPaths)
+        {
+            VERIFY_IS_TRUE(::Terminal::UnixCommandShim::ConvertLinuxPath(input).native() == expected);
+        }
+
+        constexpr std::wstring_view unchangedPaths[]{
+            L"",
+            L"-",
+            L".",
+            L"relative/path",
+            LR"(C:\my_project)",
+            L"/mnt",
+            L"/mnt/",
+            L"/mnt/1/file.txt",
+            L"/mnt/cc/file.txt",
+            L"/MNT/c/file.txt",
+        };
+        for (const auto path : unchangedPaths)
+        {
+            VERIFY_IS_TRUE(::Terminal::UnixCommandShim::ConvertLinuxPath(path).native() == path);
         }
     }
 

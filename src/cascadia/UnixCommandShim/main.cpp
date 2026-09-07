@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "CoreFileCommands.h"
+#include "PathTranslation.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -577,7 +578,7 @@ namespace
                 continue;
             }
 
-            options.operands.emplace_back(argument);
+            options.operands.emplace_back(Terminal::UnixCommandShim::ConvertLinuxPath(argument));
         }
         return true;
     }
@@ -1645,7 +1646,7 @@ namespace
             }
             else
             {
-                options.paths.emplace_back(argument);
+                options.paths.emplace_back(Terminal::UnixCommandShim::ConvertLinuxPath(argument));
             }
         }
 

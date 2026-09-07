@@ -28,6 +28,7 @@
 #include <vector>
 
 #include "CoreFileCommands.h"
+#include "PathTranslation.h"
 
 namespace
 {
@@ -451,7 +452,7 @@ namespace
                 reportError(command, {}, L"unsupported option " + std::wstring{ argument });
                 return false;
             }
-            options.files.emplace_back(argument);
+            options.files.emplace_back(Terminal::UnixCommandShim::ConvertLinuxPath(argument));
         }
 
         if (options.files.empty())
@@ -947,7 +948,7 @@ int Terminal::UnixCommandShim::Cat(const std::span<const std::wstring_view> argu
             }
             continue;
         }
-        files.emplace_back(argument);
+        files.emplace_back(Terminal::UnixCommandShim::ConvertLinuxPath(argument));
     }
 
     if (files.empty())
@@ -1101,7 +1102,7 @@ int Terminal::UnixCommandShim::Du(const std::span<const std::wstring_view> argum
             }
             continue;
         }
-        options.paths.emplace_back(argument);
+        options.paths.emplace_back(Terminal::UnixCommandShim::ConvertLinuxPath(argument));
     }
 
     if (options.all && options.summarize)
@@ -1210,7 +1211,7 @@ int Terminal::UnixCommandShim::Touch(const std::span<const std::wstring_view> ar
             }
             continue;
         }
-        paths.emplace_back(argument);
+        paths.emplace_back(Terminal::UnixCommandShim::ConvertLinuxPath(argument));
     }
 
     if (paths.empty())
@@ -1318,7 +1319,7 @@ int Terminal::UnixCommandShim::Wc(const std::span<const std::wstring_view> argum
             }
             continue;
         }
-        files.emplace_back(argument);
+        files.emplace_back(Terminal::UnixCommandShim::ConvertLinuxPath(argument));
     }
 
     if (!explicitSelection)

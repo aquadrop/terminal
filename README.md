@@ -203,6 +203,11 @@ Inside the Linux profile, every command resolves without the `.exe` suffix.
 The compatibility module redirects PowerShell's existing `cat`, `cp`, `mv`,
 and `rm` aliases to the packaged commands.
 
+The profile accepts WSL-style drive paths for `cd`, `pushd`, and every packaged
+file command. For example, `/mnt/c/my_project` addresses `C:\my_project`.
+Drive letters are case-insensitive, while paths that do not exactly match the
+`/mnt/<drive>` form retain their normal PowerShell or Windows meaning.
+
 The packaged file tools expand `*` and `?` in the final path component because
 Windows shells do not consistently perform native wildcard expansion.
 

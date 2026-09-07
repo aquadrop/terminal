@@ -30,6 +30,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoreFileCommands.h" />
+    <ClInclude Include="PathTranslation.h" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="wtcmd.exe.manifest" />

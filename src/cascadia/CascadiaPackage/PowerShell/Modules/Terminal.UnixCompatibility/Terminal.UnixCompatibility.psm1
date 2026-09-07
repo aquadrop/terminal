@@ -3,6 +3,118 @@
 
 Import-Module PSReadLine
 
+function global:ConvertFrom-TerminalLinuxPath {
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $Path
+    )
+
+    $match = [regex]::Match(
+        $Path,
+        '\A/mnt/(?<drive>[A-Za-z])(?:/(?<remainder>.*))?\z',
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+    if (-not $match.Success) {
+        return $Path
+    }
+
+    $drive = $match.Groups['drive'].Value.ToUpperInvariant()
+    $remainder = $match.Groups['remainder'].Value.Replace([char] '/', [char] '\')
+    return '{0}:\{1}' -f $drive, $remainder
+}
+
+function global:Set-TerminalLocation {
+    [CmdletBinding(DefaultParameterSetName = 'Path')]
+    param(
+        [Parameter(
+            ParameterSetName = 'Path',
+            Position = 0,
+            ValueFromPipeline,
+            ValueFromPipelineByPropertyName)]
+        [AllowEmptyString()]
+        [string] $Path,
+
+        [Parameter(
+            Mandatory,
+            ParameterSetName = 'LiteralPath',
+            ValueFromPipelineByPropertyName)]
+        [Alias('PSPath', 'LP')]
+        [AllowEmptyString()]
+        [string] $LiteralPath,
+
+        [Parameter(ParameterSetName = 'StackName')]
+        [string] $StackName,
+
+        [switch] $PassThru
+    )
+
+    process {
+        $parameters = @{}
+        foreach ($entry in $PSBoundParameters.GetEnumerator()) {
+            $parameters[$entry.Key] = $entry.Value
+        }
+        if ($parameters.ContainsKey('Path')) {
+            $parameters['Path'] = ConvertFrom-TerminalLinuxPath $parameters['Path']
+        }
+        if ($parameters.ContainsKey('LiteralPath')) {
+            $parameters['LiteralPath'] = ConvertFrom-TerminalLinuxPath $parameters['LiteralPath']
+        }
+        Microsoft.PowerShell.Management\Set-Location @parameters
+    }
+}
+
+function global:Push-TerminalLocation {
+    [CmdletBinding(DefaultParameterSetName = 'Path')]
+    param(
+        [Parameter(
+            ParameterSetName = 'Path',
+            Position = 0,
+            ValueFromPipeline,
+            ValueFromPipelineByPropertyName)]
+        [AllowEmptyString()]
+        [string] $Path,
+
+        [Parameter(
+            Mandatory,
+            ParameterSetName = 'LiteralPath',
+            ValueFromPipelineByPropertyName)]
+        [Alias('PSPath', 'LP')]
+        [AllowEmptyString()]
+        [string] $LiteralPath,
+
+        [string] $StackName,
+        [switch] $PassThru
+    )
+
+    process {
+        $parameters = @{}
+        foreach ($entry in $PSBoundParameters.GetEnumerator()) {
+            $parameters[$entry.Key] = $entry.Value
+        }
+        if ($parameters.ContainsKey('Path')) {
+            $parameters['Path'] = ConvertFrom-TerminalLinuxPath $parameters['Path']
+        }
+        if ($parameters.ContainsKey('LiteralPath')) {
+            $parameters['LiteralPath'] = ConvertFrom-TerminalLinuxPath $parameters['LiteralPath']
+        }
+        Microsoft.PowerShell.Management\Push-Location @parameters
+    }
+}
+
+function global:Pop-TerminalLocation {
+    [CmdletBinding()]
+    param(
+        [string] $StackName,
+        [switch] $PassThru
+    )
+
+    $parameters = @{}
+    foreach ($entry in $PSBoundParameters.GetEnumerator()) {
+        $parameters[$entry.Key] = $entry.Value
+    }
+    Microsoft.PowerShell.Management\Pop-Location @parameters
+}
+
 $commandRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\LinuxCommands'))
 foreach ($command in 'cat', 'cp', 'du', 'grep', 'head', 'mv', 'rm', 'tail', 'touch', 'wc') {
     $commandPath = Join-Path $commandRoot "$command.exe"
@@ -11,6 +123,9 @@ foreach ($command in 'cat', 'cp', 'du', 'grep', 'head', 'mv', 'rm', 'tail', 'tou
     }
     Set-Alias -Name $command -Value $commandPath -Scope Global -Option AllScope -Force -ErrorAction Stop
 }
+Set-Alias -Name cd -Value Set-TerminalLocation -Scope Global -Option AllScope -Force -ErrorAction Stop
+Set-Alias -Name pushd -Value Push-TerminalLocation -Scope Global -Option AllScope -Force -ErrorAction Stop
+Set-Alias -Name popd -Value Pop-TerminalLocation -Scope Global -Option AllScope -Force -ErrorAction Stop
 
 function Resolve-TerminalHistoryEvent {
     param(
