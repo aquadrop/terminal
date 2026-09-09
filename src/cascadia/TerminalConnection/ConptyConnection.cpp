@@ -161,6 +161,7 @@ namespace winrt::Microsoft::Terminal::TerminalConnection::implementation
         }
 
         auto [newCommandLine, newStartingDirectory] = Utils::MangleStartingDirectoryForWSL(cmdline, _startingDirectory);
+        Utils::InjectPowerShellDirectoryReporting(newCommandLine);
         const auto startingDirectory = newStartingDirectory.size() > 0 ? newStartingDirectory.c_str() : nullptr;
 
         THROW_IF_WIN32_BOOL_FALSE(CreateProcessW(

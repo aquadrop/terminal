@@ -390,4 +390,19 @@ void TerminalCoreUnitTests::TerminalApiTest::SetWorkingDirectory()
 
     stateMachine.ProcessString(L"\x1b]9;9;D:\\中文\x1b\\");
     VERIFY_ARE_EQUAL(term.GetWorkingDirectory(), L"D:\\中文");
+
+    stateMachine.ProcessString(L"\x1b]9;9;\"C:\\Documents\\Projects\"\x1b\\");
+    VERIFY_ARE_EQUAL(term.GetWorkingDirectory(), L"C:\\Documents\\Projects");
+
+    stateMachine.ProcessString(L"\x1b]9;9;\"C:\\Program Files\\Project#%;\"\x1b\\");
+    VERIFY_ARE_EQUAL(term.GetWorkingDirectory(), L"C:\\Program Files\\Project#%;");
+
+    stateMachine.ProcessString(L"\x1b]9;9;\"D:\\中文;project\"\x1b\\");
+    VERIFY_ARE_EQUAL(term.GetWorkingDirectory(), L"D:\\中文;project");
+
+    stateMachine.ProcessString(L"\x1b]9;9;C:\\Projects;archive\\more;work\x1b\\");
+    VERIFY_ARE_EQUAL(term.GetWorkingDirectory(), L"C:\\Projects;archive\\more;work");
+
+    stateMachine.ProcessString(L"\x1b]9;9;\"\\\\server\\share\\Project Files;Archive\"\x1b\\");
+    VERIFY_ARE_EQUAL(term.GetWorkingDirectory(), L"\\\\server\\share\\Project Files;Archive");
 }

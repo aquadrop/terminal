@@ -10,6 +10,7 @@
 #include "inc/colorTable.hpp"
 
 #include <icu.h>
+#include <shellapi.h>
 
 using namespace Microsoft::Console;
 
@@ -1104,6 +1105,62 @@ std::tuple<std::wstring, std::wstring> Utils::MangleStartingDirectoryForWSL(std:
         startingDirectory == L"~" ? wil::ExpandEnvironmentStringsW<std::wstring>(L"%USERPROFILE%") :
                                     std::wstring{ startingDirectory }
     };
+}
+
+void Utils::InjectPowerShellDirectoryReporting(std::wstring& commandLine)
+{
+    if (commandLine.empty())
+    {
+        return;
+    }
+
+    auto argc = 0;
+    wil::unique_hlocal_ptr<PWSTR[]> argv{ CommandLineToArgvW(commandLine.c_str(), &argc) };
+    THROW_LAST_ERROR_IF(!argc);
+    const auto args = std::span{ argv.get(), gsl::narrow<size_t>(argc) };
+    const auto executable = std::filesystem::path{ args.front() }.filename().native();
+    if (!til::equals_insensitive_ascii(executable, L"pwsh") &&
+        !til::equals_insensitive_ascii(executable, L"pwsh.exe"))
+    {
+        return;
+    }
+
+    bool hasNoExit = false;
+    for (const auto argument : args.subspan(1))
+    {
+        if (til::equals_insensitive_ascii(argument, L"-NoExit"))
+        {
+            hasNoExit = true;
+        }
+        else if (!til::equals_insensitive_ascii(argument, L"-NoLogo") &&
+                 !til::equals_insensitive_ascii(argument, L"-NoProfile"))
+        {
+            return;
+        }
+    }
+
+    if (!hasNoExit)
+    {
+        commandLine.append(L" -NoExit");
+    }
+
+    // PowerShell loads profiles before running -Command. Decorate only its built-in
+    // prompt, leaving custom prompts and their existing shell integration untouched.
+    // Return the report with the prompt to avoid Console.Out's legacy encoding.
+    commandLine.append(LR"ps( -Command "& {
+    if ($ExecutionContext.SessionState.LanguageMode -eq 'FullLanguage' -and
+        $function:prompt -and
+        $function:prompt.ToString() -eq [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault2().Commands['prompt'][0].Definition) {
+        $originalPrompt = $function:prompt
+        $function:global:prompt = {
+            $prompt = & $originalPrompt
+            if ($PWD.Provider.Name -eq 'FileSystem') {
+                $prompt = ('{0}]9;9;{1}{2}{1}{0}\' -f [char]27, [char]34, $PWD.ProviderPath) + $prompt
+            }
+            $prompt
+        }.GetNewClosure()
+    }
+}")ps");
 }
 
 std::wstring_view Utils::TrimPaste(std::wstring_view textView) noexcept
