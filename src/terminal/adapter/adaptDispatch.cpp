@@ -3610,7 +3610,8 @@ void AdaptDispatch::DoConEmuAction(const std::wstring_view string)
     {
         if (parts.size() >= 2)
         {
-            auto path = til::at(parts, 1);
+            // The path is the final field and can itself contain semicolons.
+            auto path = string.substr(string.find(L';') + 1);
             // The path should be surrounded with '"' according to the documentation of ConEmu.
             // An example: 9;"D:/"
             // If we fail to find the surrounding quotation marks, we'll give the path a try anyway.

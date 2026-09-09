@@ -529,6 +529,11 @@ specify the string that would be presented in that flyout.
 
 #### Automatic shell integration
 
+Terminal provides limited [directory reporting for PowerShell's default
+prompt](../../shell-integration.md) without editing the user's shell config.
+The following discussion concerns broader shell-integration features and
+arbitrary shell customizations.
+
 A large portion of these features all rely on shell integration being enabled by
 the user. However, this is not a trivial thing for the Terminal to do on behalf
 of the user. Shell integration relies on changes to the user's shell config. If

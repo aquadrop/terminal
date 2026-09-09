@@ -8,6 +8,7 @@
 #include "../inc/utils.hpp"
 #include "../inc/colorTable.hpp"
 #include <conattrs.hpp>
+#include <shellapi.h>
 
 using namespace WEX::Common;
 using namespace WEX::Logging;
@@ -28,6 +29,9 @@ class UtilsTests
 
 #if !__INSIDE_WINDOWS
     TEST_METHOD(TestMangleWSLPaths);
+    TEST_METHOD(TestInjectPowerShellDirectoryReporting);
+    TEST_METHOD(TestSkipPowerShellDirectoryReporting);
+    TEST_METHOD(TestPowerShellDirectoryReportingPrompt);
 #endif
 
     TEST_METHOD(TestTrimTrailingWhitespace);
@@ -516,6 +520,237 @@ void UtilsTests::TestMangleWSLPaths()
         VERIFY_ARE_EQUAL(LR"(powershell.exe)", commandline);
         VERIFY_ARE_EQUAL(expectedUserProfilePath, path);
     }
+}
+
+void UtilsTests::TestInjectPowerShellDirectoryReporting()
+{
+    static constexpr struct
+    {
+        std::wstring_view commandLine;
+        int argumentCount;
+    } cases[] = {
+        { L"pwsh", 4 },
+        { L"pwsh.exe", 4 },
+        { L"PWSH.EXE", 4 },
+        { LR"("C:\Program Files\PowerShell\7\pwsh.exe")", 4 },
+        { LR"("C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo)", 5 },
+        { L"pwsh -NoProfile", 5 },
+        { L"pwsh -NoLogo -NoProfile", 6 },
+        { L"pwsh -NoExit", 4 },
+        { L"pwsh -NoExit -NoLogo -NoProfile", 6 },
+        { L"pwsh -noprofile -NOLOGO", 6 },
+        { L"pwsh.exe\t-NoLogo ", 5 },
+    };
+
+    std::wstring startupScript;
+    for (const auto& test : cases)
+    {
+        std::wstring commandLine{ test.commandLine };
+        InjectPowerShellDirectoryReporting(commandLine);
+        VERIFY_IS_TRUE(commandLine.starts_with(test.commandLine));
+
+        auto argc = 0;
+        wil::unique_hlocal_ptr<PWSTR[]> argv{ CommandLineToArgvW(commandLine.c_str(), &argc) };
+        VERIFY_ARE_EQUAL(test.argumentCount, argc);
+        const auto args = std::span{ argv.get(), gsl::narrow<size_t>(argc) };
+        VERIFY_ARE_EQUAL(L"-Command", std::wstring_view{ args[args.size() - 2] });
+
+        const std::wstring_view script{ args.back() };
+        VERIFY_IS_TRUE(script.starts_with(L"& {"));
+        VERIFY_ARE_NOT_EQUAL(std::wstring_view::npos, script.find(L"]9;9;"));
+        if (startupScript.empty())
+        {
+            startupScript = script;
+        }
+        VERIFY_ARE_EQUAL(startupScript, script);
+
+        const auto injected = commandLine;
+        InjectPowerShellDirectoryReporting(commandLine);
+        VERIFY_ARE_EQUAL(injected, commandLine);
+    }
+}
+
+void UtilsTests::TestSkipPowerShellDirectoryReporting()
+{
+    static constexpr std::wstring_view cases[] = {
+        L"",
+        L" ",
+        L"cmd.exe",
+        L"powershell.exe",
+        L"wsl.exe pwsh",
+        L"pwsh.cmd",
+        L"not-pwsh.exe",
+        L"pwsh -Command Get-Location",
+        L"pwsh -NoExit -Command Get-Location",
+        L"pwsh -c Get-Location",
+        L"pwsh -File script.ps1",
+        L"pwsh -NoProfile -File script.ps1",
+        L"pwsh -EncodedCommand AAAA",
+        L"pwsh -NonInteractive",
+        L"pwsh -WorkingDirectory ~",
+        L"pwsh -Version",
+        L"pwsh -?",
+    };
+
+    for (const auto original : cases)
+    {
+        std::wstring commandLine{ original };
+        InjectPowerShellDirectoryReporting(commandLine);
+        VERIFY_ARE_EQUAL(original, commandLine);
+    }
+}
+
+void UtilsTests::TestPowerShellDirectoryReportingPrompt()
+{
+    std::wstring pwshPath;
+    const auto searchResult = wil::SearchPathW(nullptr, L"pwsh.exe", nullptr, pwshPath);
+    if (searchResult == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
+    {
+        Log::Result(TestResults::Skipped, L"PowerShell 7 is required for this test.");
+        return;
+    }
+    VERIFY_SUCCEEDED(searchResult);
+
+    std::wstring commandLine{ L"pwsh" };
+    InjectPowerShellDirectoryReporting(commandLine);
+    auto argc = 0;
+    wil::unique_hlocal_ptr<PWSTR[]> argv{ CommandLineToArgvW(commandLine.c_str(), &argc) };
+    VERIFY_ARE_EQUAL(4, argc);
+    const auto args = std::span{ argv.get(), gsl::narrow<size_t>(argc) };
+
+    std::wstring script{ L"$install = {\n" };
+    script.append(args.back());
+    script.append(LR"ps(
+}
+$ErrorActionPreference = 'Stop'
+try {
+    $originalDirectory = $PWD.ProviderPath
+    $defaultPrompt = $function:prompt
+    $stdout = [Console]::Out
+    $writer = [IO.StringWriter]::new()
+    $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('Terminal-' + [guid]::NewGuid())
+    $testDirectory = Join-Path $testRoot ('Project''s ; # % {0}' -f [char]0x4E2D)
+    [IO.Directory]::CreateDirectory($testDirectory) | Out-Null
+    try {
+        [Console]::SetOut($writer)
+        & $install
+        $global:LASTEXITCODE = 37
+        foreach ($directory in @($env:SystemRoot, $env:ProgramFiles, $testDirectory)) {
+            Set-Location -LiteralPath $directory
+            $expectedPrompt = & $defaultPrompt
+            $writer.GetStringBuilder().Clear() | Out-Null
+            $actualPrompt = prompt
+            $expectedReport = '{0}]9;9;{1}{2}{1}{0}\' -f [char]27, [char]34, $PWD.ProviderPath
+            if ($actualPrompt -cne ($expectedReport + $expectedPrompt)) { throw 'The current directory or visible default prompt changed.' }
+            if ($writer.ToString().Length -ne 0) { throw 'The report bypassed PowerShell prompt rendering.' }
+            if ($global:LASTEXITCODE -ne 37) { throw 'The native exit code changed.' }
+        }
+
+        New-PSDrive -Name WTDirectoryTest -PSProvider FileSystem -Root $testRoot | Out-Null
+        Set-Location -LiteralPath 'WTDirectoryTest:\'
+        $writer.GetStringBuilder().Clear() | Out-Null
+        $actualPrompt = prompt
+        $expectedReport = '{0}]9;9;{1}{2}{1}{0}\' -f [char]27, [char]34, ($testRoot + [IO.Path]::DirectorySeparatorChar)
+        if ($actualPrompt -cne ($expectedReport + (& $defaultPrompt))) { throw 'A PSDrive was not reported as a filesystem path.' }
+        if ($writer.ToString().Length -ne 0) { throw 'The PSDrive report bypassed PowerShell prompt rendering.' }
+
+        Set-Location -LiteralPath 'Env:\'
+        $writer.GetStringBuilder().Clear() | Out-Null
+        $actualPrompt = prompt
+        if ($writer.ToString().Length -ne 0) { throw 'A non-filesystem location was reported.' }
+        if ($actualPrompt -cne (& $defaultPrompt)) { throw 'The non-filesystem prompt changed.' }
+
+        Set-Location -LiteralPath $originalDirectory
+        Remove-PSDrive -Name WTDirectoryTest
+        function global:prompt { 'CUSTOM> ' }
+        $customPrompt = $function:prompt
+        & $install
+        $writer.GetStringBuilder().Clear() | Out-Null
+        if ($function:prompt -ne $customPrompt) { throw 'A custom prompt was replaced.' }
+        if ((prompt) -cne 'CUSTOM> ') { throw 'The custom prompt output changed.' }
+        if ($writer.ToString().Length -ne 0) { throw 'Reporting was added to a custom prompt.' }
+
+        Remove-Item Function:\prompt
+        & $install
+        if (Test-Path Function:\prompt) { throw 'A missing prompt was replaced.' }
+    }
+    finally {
+        [Console]::SetOut($stdout)
+        Set-Location -LiteralPath $originalDirectory
+        [IO.Directory]::Delete($testDirectory)
+        [IO.Directory]::Delete($testRoot)
+        $writer.Dispose()
+    }
+
+    $state = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault2()
+    $state.LanguageMode = 'ConstrainedLanguage'
+    $runspace = [runspacefactory]::CreateRunspace($state)
+    $powershell = [powershell]::Create()
+    try {
+        $runspace.Open()
+        $powershell.Runspace = $runspace
+        $before = [string]($powershell.AddScript('(Get-Item Function:\prompt).Definition').Invoke()[0])
+        if ($powershell.HadErrors) { throw 'Could not inspect the constrained-language prompt.' }
+        $powershell.Commands.Clear()
+        $null = $powershell.AddScript($install.ToString()).Invoke()
+        if ($powershell.HadErrors) { throw 'Directory reporting failed in constrained language.' }
+        $powershell.Commands.Clear()
+        $after = [string]($powershell.AddScript('(Get-Item Function:\prompt).Definition').Invoke()[0])
+        if ($powershell.HadErrors -or $before -cne $after) { throw 'The constrained-language prompt changed.' }
+    }
+    finally {
+        $powershell.Dispose()
+        $runspace.Dispose()
+    }
+    exit 0
+}
+catch {
+    [Console]::Error.WriteLine($_)
+    exit 1
+}
+)ps");
+    commandLine = fmt::format(FMT_COMPILE(LR"("{}" -NoLogo -NoProfile -NonInteractive -Command "{}")"), pwshPath, script);
+
+    const auto outputPath = std::filesystem::temp_directory_path() / (L"Terminal-" + GuidToPlainString(CreateGuid()) + L".log");
+    SECURITY_ATTRIBUTES security{ .nLength = sizeof(security), .bInheritHandle = TRUE };
+    wil::unique_hfile outputFile{ CreateFileW(outputPath.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, &security, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr) };
+    VERIFY_ARE_NOT_EQUAL(INVALID_HANDLE_VALUE, outputFile.get());
+    wil::unique_hfile inputFile{ CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &security, OPEN_EXISTING, 0, nullptr) };
+    VERIFY_ARE_NOT_EQUAL(INVALID_HANDLE_VALUE, inputFile.get());
+
+    STARTUPINFOW startupInfo{
+        .cb = sizeof(startupInfo),
+        .dwFlags = STARTF_USESTDHANDLES,
+        .hStdInput = inputFile.get(),
+        .hStdOutput = outputFile.get(),
+        .hStdError = outputFile.get(),
+    };
+    wil::unique_process_information process;
+    VERIFY_WIN32_BOOL_SUCCEEDED(CreateProcessW(nullptr, commandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &startupInfo, process.addressof()));
+    const auto cleanup = wil::scope_exit([&] {
+        if (WaitForSingleObject(process.hProcess, 0) == WAIT_TIMEOUT)
+        {
+            LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(process.hProcess, 1));
+            WaitForSingleObject(process.hProcess, 5000);
+        }
+    });
+    VERIFY_ARE_EQUAL(DWORD{ WAIT_OBJECT_0 }, WaitForSingleObject(process.hProcess, 30000));
+
+    LARGE_INTEGER outputSize{};
+    VERIFY_WIN32_BOOL_SUCCEEDED(GetFileSizeEx(outputFile.get(), &outputSize));
+    VERIFY_WIN32_BOOL_SUCCEEDED(SetFilePointerEx(outputFile.get(), {}, nullptr, FILE_BEGIN));
+    std::string output(gsl::narrow<size_t>(outputSize.QuadPart), '\0');
+    DWORD bytesRead{};
+    VERIFY_WIN32_BOOL_SUCCEEDED(ReadFile(outputFile.get(), output.data(), gsl::narrow<DWORD>(output.size()), &bytesRead, nullptr));
+    VERIFY_ARE_EQUAL(output.size(), static_cast<size_t>(bytesRead));
+    if (!output.empty())
+    {
+        Log::Comment(til::u8u16(output).c_str());
+    }
+
+    DWORD exitCode{};
+    VERIFY_WIN32_BOOL_SUCCEEDED(GetExitCodeProcess(process.hProcess, &exitCode));
+    VERIFY_ARE_EQUAL(0ul, exitCode);
 }
 #endif
 
